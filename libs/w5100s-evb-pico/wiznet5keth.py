@@ -38,22 +38,23 @@ class NetworkConfig:
     """A Netork Config object"""
     def __init__(
         self,
+        mac,
         ipv4_addr=None,
         subnet_mask=None,
         default_gateway=None,
         dns=None
     ):
+        self.mac = mac
         self.ipv4_addr = ipv4_addr
         self.subnet_mask = subnet_mask
         self.default_gateway = default_gateway
         self.dns = dns
 
 
-def config_eth(mac_addr_str, netconfig, debug=False):
+def config_eth(netconfig, debug=False):
     """Configures the ethernet adaptor, return initialized ethernet object
 
     Args:
-        mac_addr_str (str): a unique mac address
         netconfig (NetworkConfig): An instance of the NetworkConfig class
         debug (bool): defaults False
 
@@ -69,15 +70,17 @@ def config_eth(mac_addr_str, netconfig, debug=False):
     ethernet_rst.value = True
 
     # we always need a mac address
-    mac_addr = tuple((int(x, 16) for x in  mac_addr_str.split(":")))
+    if not netconfig.mac:
+        raise Exception("Must provide mac address to NetworkConfig")
+
+    mac_addr = tuple((int(x, 16) for x in netconfig.mac.split(":")))
     if not all([netconfig.ipv4_addr, netconfig.subnet_mask, netconfig.default_gateway, netconfig.dns]):  # DHCP mode
         print("Assuming DHCP setup as some/all network config values were set to None")
         eth = WIZNET5K(spi_bus, chip_select_pin, is_dhcp=True, mac=mac_addr, debug=debug)
     else:
-        manual_config = vars(netconfig)
-        print(f"Manual network config to be set: {manual_config}")
+        print("Setting manual configuration from config.json file")
         eth = WIZNET5K(spi_bus, chip_select_pin, is_dhcp=False, mac=mac_addr, debug=debug)
-        eth.ifconfig(**manual_config)
+        eth.ifconfig(netconfig.ipv4_addr, netconfig.subnet_mask, netconfig.default_gateway, netconfig.dns)
 
     print("Chip Version:", eth.chip)
     print("MAC Address:", [hex(i) for i in eth.mac_address])
